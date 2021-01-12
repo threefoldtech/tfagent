@@ -95,6 +95,11 @@ func (s *Server) handleCon(conn net.Conn) {
 		cmd := strings.ToUpper(string(command.Get(0)))
 		switch cmd {
 		case "HELLO":
+			if command.ArgCount() != 1 {
+				writeErr = writer.WriteError(errInvalidArgCount.Error())
+				break
+			}
+			writeErr = writer.WriteObjectsSlice(s.helloInfo())
 		case "AUTH":
 			if command.ArgCount() != 3 {
 				writeErr = writer.WriteError(errInvalidArgCount.Error())
@@ -163,3 +168,15 @@ var errInvalidCommand = errors.New("unknown command")
 var errInvalidArgCount = errors.New("invalid amount of argument for command")
 var errInvalidSignatureLength = errors.New("invalid signature length")
 var errAuthorizationFailed = errors.New("authorization failed")
+
+const serverVersion = "0.1.0"
+const protoVersion = 1
+
+func (s *Server) helloInfo() []interface{} {
+	// old style hello, trimmed down
+	return []interface{}{"server", "tfagent", "version", serverVersion, "proto", protoVersion, "id", s.peerID()}
+}
+
+func (s *Server) peerID() string {
+	return "//TODO"
+}

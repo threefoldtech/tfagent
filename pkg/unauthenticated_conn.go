@@ -19,9 +19,6 @@ func newUnauthenticatedConn(s *Server) *unauthenticatedConn {
 	}
 }
 
-func (conn *unauthenticatedConn) HELLO() error {
-	return nil
-}
 
 func (conn *unauthenticatedConn) Auth(dtid uint64, rawSig []byte) error {
 	var sig [64]byte

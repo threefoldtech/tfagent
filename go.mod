@@ -3,6 +3,7 @@ module github.com/threefoldtech/tfagent
 go 1.15
 
 require (
+	github.com/centrifuge/go-substrate-rpc-client/v2 v2.0.1
 	github.com/gorilla/mux v1.7.4
 	github.com/libp2p/go-libp2p v0.13.0
 	github.com/libp2p/go-libp2p-connmgr v0.2.4
