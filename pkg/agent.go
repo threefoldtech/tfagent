@@ -2,7 +2,7 @@ package pkg
 
 // Agent is the main tft agent entity
 type Agent struct {
-	network ConnectionManager
+	// 	network ConnectionManager
 }
 
 // SetupAdminControl for the agent, allowing it to be controlled over an http

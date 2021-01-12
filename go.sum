@@ -856,6 +856,7 @@ github.com/rs/xhandler v0.0.0-20160618193221-ed27b6fd6521/go.mod h1:RvLn4FgxWubr
 github.com/rs/xid v1.2.1/go.mod h1:+uKXf+4Djp6Md1KODXJxgGQPKngRmWyn10oCKFzNHOQ=
 github.com/rs/zerolog v1.14.3/go.mod h1:3WXPzbXEEliJ+a6UFE4vhIxV8qR1EML6ngzP9ug4eYg=
 github.com/rs/zerolog v1.18.0/go.mod h1:9nvC1axdVrAHcu/s9taAVfBuIdTZLVQmKQyvrUjF5+I=
+github.com/rs/zerolog v1.19.0 h1:hYz4ZVdUgjXTBUmrkrw55j1nHx68LfOKIQk5IYtyScg=
 github.com/rs/zerolog v1.19.0/go.mod h1:IzD0RJ65iWH0w97OQQebJEvTZYvsCUm9WVLWBQrJRjo=
 github.com/rubenv/sql-migrate v0.0.0-20190717103323-87ce952f7079/go.mod h1:WS0rl9eEliYI8DPnr3TOwz4439pay+qNgzJoVya/DmY=
 github.com/rusart/muxprom v0.0.0-20200323164249-36ea051efbe6/go.mod h1:GWiHVzK0fC7MY2dtQ+js0B7yRqwZVlej6qN28MonuUQ=
@@ -863,6 +864,8 @@ github.com/russross/blackfriday v1.5.2/go.mod h1:JO/DiYxRf+HjHt06OyowR9PTA263kcR
 github.com/russross/blackfriday/v2 v2.0.1/go.mod h1:+Rmxgy9KzJVeS9/2gXHxylqXiyQDYRxCVz55jmeOWTM=
 github.com/safchain/ethtool v0.0.0-20190326074333-42ed695e3de8/go.mod h1:Z0q5wiBQGYcxhMZ6gUqHn6pYNLypFAvaL3UvgZLR0U4=
 github.com/sebest/xff v0.0.0-20150611211316-7a36e3a787b5/go.mod h1:wozgYq9WEBQBaIJe4YZ0qTSFAMxmcwBhQH0fO0R34Z0=
+github.com/secmask/go-redisproto v0.1.0 h1:hOMwrBCipUSpK+f3RG/MxTcGFEOO6Oig5ZXOAewn9M4=
+github.com/secmask/go-redisproto v0.1.0/go.mod h1:jdj5Hw1t1c0xGmYOf3Rv4sM/nhbIP3RypZ29jGZjZ5A=
 github.com/segmentio/go-loggly v0.5.1-0.20171222203950-eb91657e62b2/go.mod h1:8zLRYR5npGjaOXgPSKat5+oOh+UHd8OdbS18iqX9F6Y=
 github.com/sergi/go-diff v0.0.0-20161205080420-83532ca1c1ca/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=
 github.com/sergi/go-diff v1.0.0/go.mod h1:0CfEIISq7TuYL3j771MWULgwwjU+GofnZX9QAmXWZgo=

@@ -12,6 +12,8 @@ require (
 	github.com/libp2p/go-libp2p-secio v0.2.2
 	github.com/libp2p/go-libp2p-tls v0.1.3
 	github.com/pkg/errors v0.9.1
+	github.com/rs/zerolog v1.19.0
+	github.com/secmask/go-redisproto v0.1.0
 	github.com/stellar/go v0.0.0-20201218182351-013bf861cb0f
 	github.com/threefoldtech/tfexplorer v0.4.7
 	go.mongodb.org/mongo-driver v1.4.4
