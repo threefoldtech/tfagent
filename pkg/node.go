@@ -1,12 +1,8 @@
 package pkg
 
 import (
-	"bufio"
 	"context"
-	"encoding/hex"
-	"fmt"
-	"log"
-	"strings"
+	"encoding/json"
 	"time"
 
 	"github.com/libp2p/go-libp2p"
@@ -21,89 +17,78 @@ import (
 	secio "github.com/libp2p/go-libp2p-secio"
 	libp2ptls "github.com/libp2p/go-libp2p-tls"
 	"github.com/pkg/errors"
+	"github.com/rs/zerolog/log"
 )
 
-const protocolID = "/echo/proto/1.0.0"
+const protocolID = "/tfagent/message/1.0.0"
 
-//ConnectionManager handles streams amd connections
-type ConnectionManager struct {
-	Ctx      context.Context
-	Host     host.Host
-	Routing  routing.PeerRouting
-	Messages chan Msg
+// P2PNode handles streams amd connections
+type P2PNode struct {
+	ctx     context.Context
+	host    host.Host
+	routing routing.PeerRouting
+	msgChan chan<- Message
 }
 
-// Msg chan
-type Msg struct {
-	Remote peer.ID
-	M      string
+func NewP2PNode(msgChan chan<- Message) *P2PNode {
+	return &P2PNode{
+		msgChan: msgChan,
+	}
 }
 
 // Send sends a message to a list of addresses
-func (c *ConnectionManager) Send(message []byte, peerID peer.ID) error {
-	if c.Ctx.Err() != nil {
-		return errors.Wrap(c.Ctx.Err(), "failed to send message")
+func (c *P2PNode) Send(message Message, peerID peer.ID, timeout time.Duration) error {
+	if c.ctx.Err() != nil {
+		return errors.Wrap(c.ctx.Err(), "failed to send message")
 	}
-	ctx, cancel := context.WithCancel(c.Ctx)
+	ctx, cancel := context.WithTimeout(c.ctx, timeout)
 	defer cancel()
 
-	s, err := c.Host.NewStream(ctx, peerID, protocolID)
+	s, err := c.host.NewStream(ctx, peerID, protocolID)
 	if err != nil {
 		return errors.Wrap(err, "could not open new stream to remote")
 	}
 
-	writer := bufio.NewWriter(s)
-	_, err = writer.WriteString(string(message) + "\n")
-
-	err = writer.Flush()
-	if err != nil {
-		log.Println("Failed to send the transaction to sign to", peerID, ":", err)
+	if err = json.NewEncoder(s).Encode(message); err != nil {
+		log.Error().Err(err).Str("peerID", string(peerID)).Msg("could not send message to peer")
+		return err
 	}
-	log.Println("[DEBUG] Sent message to", peerID, ":'", string(message), "'")
-	cancel()
+
+	log.Debug().Str("peerID", string(peerID)).Msg("sent message")
 
 	return err
 }
 
-//Start creates a libp2p host and starts handling connections
-func (c *ConnectionManager) Start(ctx context.Context, privateKey crypto.PrivKey) (err error) {
-	c.Ctx = ctx
-	libp2pCtx, unused := context.WithCancel(ctx)
-	_ = unused // pacify vet lostcancel check: libp2pCtx is always canceled through its parent
-	c.Host, c.Routing, err = createLibp2pHost(libp2pCtx, privateKey)
+// Start creates a libp2p host and starts handling connections
+func (c *P2PNode) Start(ctx context.Context, privateKey crypto.PrivKey) (err error) {
+	c.ctx = ctx
+	c.host, c.routing, err = createLibp2pHost(ctx, privateKey)
 	if err != nil {
 		return
 	}
 
-	fmt.Println("Started dht peer", c.Host.ID().Pretty())
-	if c.Messages == nil {
-		c.Messages = make(chan Msg)
-	}
+	log.Info().Str("ID", c.host.ID().Pretty()).Msg("started dht peer")
 
-	c.Host.SetStreamHandler(protocolID, func(s p2pnetwork.Stream) {
+	c.host.SetStreamHandler(protocolID, func(s p2pnetwork.Stream) {
 		connection := s.Conn()
-		keybytes, err := connection.RemotePublicKey().Bytes()
-		if err != nil {
-			log.Println("Failed to read message")
+
+		log.Debug().Str("peerID", connection.RemotePeer().Pretty()).Msg("got a new stream from remote")
+
+		msg := Message{}
+		if err = json.NewDecoder(s).Decode(&msg); err != nil {
+			log.Debug().Err(err).Msg("could not decode message from peer")
 			return
 		}
-		log.Println("Got a new stream from", connection.RemotePeer())
-		log.Println("remote pubkey", hex.EncodeToString(keybytes))
-		rw := bufio.NewReadWriter(bufio.NewReader(s), bufio.NewWriter(s))
-		message, err := rw.ReadString('\n')
-		if err != nil {
-			log.Println("Failed to read message")
-			return
-		}
-		message = strings.TrimSuffix(message, "\n")
-		c.Messages <- Msg{
-			M:      message,
-			Remote: connection.RemotePeer(),
-		}
-		s.Close() //TODO: don't close it immediately but reuse when possible.
+
+		c.msgChan <- msg
+		s.Close() // TODO: don't close it immediately but reuse when possible.
 	})
 
 	return nil
+}
+
+func (c *P2PNode) PeerID() string {
+	return c.host.ID().Pretty()
 }
 
 func createLibp2pHost(ctx context.Context, privateKey crypto.PrivKey) (host.Host, routing.PeerRouting, error) {

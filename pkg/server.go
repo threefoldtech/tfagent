@@ -1,10 +1,9 @@
 package pkg
 
 import (
-	"bufio"
 	"context"
-	"encoding/hex"
 	"fmt"
+	"io"
 	"net"
 	"strconv"
 	"strings"
@@ -16,17 +15,22 @@ import (
 
 // Server accepting connections, running RESP with custom commands
 type Server struct {
-	ps PeerStore
+	ps   PeerStore
+	node *P2PNode
 
 	ln net.Listener
 
 	ctx context.Context
 }
 
-// CreateServer creates a new server. This binds the given port, but does not
+// NewServer creates a new server. This binds the given port, but does not
 // yet accept incomming connections
-func CreateServer(ctx context.Context, port uint16, ps PeerStore) (*Server, error) {
-	s := &Server{ps: ps}
+func NewServer(ctx context.Context, port uint16, ps PeerStore, node *P2PNode) (*Server, error) {
+	s := &Server{
+		ps:   ps,
+		ctx:  ctx,
+		node: node,
+	}
 
 	// create a default listenerconfig so we can pass the context
 	listener, err := (&net.ListenConfig{}).Listen(ctx, "tcp", fmt.Sprintf(":%d", port))
@@ -76,7 +80,10 @@ func (s *Server) Close() error {
 
 func (s *Server) handleCon(conn net.Conn) {
 	parser := redisproto.NewParser(conn)
-	writer := redisproto.NewWriter(bufio.NewWriter(conn))
+	// writer := redisproto.NewWriter(bufio.NewWriter(conn))
+	writer := redisproto.NewWriter(conn)
+
+	var c connection = newUnauthenticatedConn(s)
 
 	for {
 		// Don't use the `Commands()` channel here, as that exits on any error,
@@ -85,98 +92,100 @@ func (s *Server) handleCon(conn net.Conn) {
 		if err != nil {
 			if errors.Is(err, &redisproto.ProtocolError{}) {
 				writer.WriteError(err.Error())
-			} else {
-				log.Error().Err(err).Msg("failed to read command")
+				continue
+			}
+			if errors.Is(err, io.EOF) {
+				log.Debug().Msg("client closed connection")
 				return
 			}
+			log.Error().Err(err).Msg("failed to read command")
+			return
 		}
 
-		var writeErr error
 		cmd := strings.ToUpper(string(command.Get(0)))
 		switch cmd {
+		case "PING":
+			log.Debug().Msg("client PING command")
+			err = writer.WriteSimpleString("PONG")
 		case "HELLO":
+			log.Debug().Msg("client HELLO command")
 			if command.ArgCount() != 1 {
-				writeErr = writer.WriteError(errInvalidArgCount.Error())
+				err = writer.WriteError(errInvalidArgCount.Error())
 				break
 			}
-			writeErr = writer.WriteObjectsSlice(s.helloInfo())
+			err = writer.WriteObjectsSlice(s.helloInfo())
 		case "AUTH":
+			log.Debug().Msg("client AUTH command")
 			if command.ArgCount() != 3 {
-				writeErr = writer.WriteError(errInvalidArgCount.Error())
+				err = writer.WriteError(errInvalidArgCount.Error())
 				break
 			}
 
 			// first arg is the dtid
-			dtid, err := strconv.ParseUint(string(command.Get(1)), 10, 64)
+			var dtid uint64 // declare here so we don't shadow err below
+			dtid, err = strconv.ParseUint(string(command.Get(1)), 10, 64)
 			if err != nil {
-				writeErr = writer.WriteError(err.Error())
+				err = writer.WriteError(err.Error())
 				break
 			}
 
-			// second arg is the signature. Accept either a raw byte array of
-			// len64, or a byte array of len 128, which we then assume is the
-			// hex encoded signature
+			// second arg is the signature.
 			rawSig := command.Get(2)
-			var sig [64]byte
-			switch len(rawSig) {
-				case 64:
-					copy(sig[:], rawSig)
-				case 128:
-					var data []byte
-					data, err = hex.DecodeString(string(rawSig))
-					if err != nil {
-						break
-					}
-					copy(sig[:], data)
-				default:
-					err = errInvalidSignatureLength
-			}
-			if err != nil {
-			writeErr = writer.WriteError(err.Error())
-			break
+
+			if err = c.Auth(dtid, rawSig); err != nil {
+				err = writer.WriteError(err.Error())
+				break
 			}
 
-			pk, err := s.ps.PublicKey(dtid)
-			if err != nil {
-					writeErr = writer.WriteError("invalid signature length")
-					break
-			}
+			// upgrade connection
+			c = newAuthenticatedConn(dtid, s)
+			err = writer.WriteSimpleString("Authenticated")
 
-			if signatureValid(pk, sig) {
-				writeErr = writer.WriteSimpleString("OK")
-				// TODO upgrade to authenticated conn
-			} else {
-				writeErr = writer.WriteError("authentication failed")
-			}
 		case "LPUSH":
+			log.Debug().Msg("client LPUSH command")
 		case "LPOP":
+			log.Debug().Msg("client LPOP command")
 		case "LLEN":
+			log.Debug().Msg("client LLEN command")
 		case "LRANGE":
+			log.Debug().Msg("client LRANGE command")
 		default:
-			writeErr = writer.WriteError(errInvalidCommand.Error())
+			log.Debug().Str("CMD", cmd).Msg("client sent unknown command")
+			err = writer.WriteError(errInvalidCommand.Error())
 		}
 
-		if writeErr != nil {
-			log.Error().Err(writeErr).Msg("could not write to connection")
+		if err != nil {
+			log.Error().Err(err).Msg("could not write to connection")
 			return
 		}
 	}
 }
 
+var (
+	errInvalidCommand         = errors.New("unknown command")
+	errInvalidArgCount        = errors.New("invalid amount of argument for command")
+	errAuthorizationFailed    = errors.New("authorization failed")
+)
 
-var errInvalidCommand = errors.New("unknown command")
-var errInvalidArgCount = errors.New("invalid amount of argument for command")
-var errInvalidSignatureLength = errors.New("invalid signature length")
-var errAuthorizationFailed = errors.New("authorization failed")
-
-const serverVersion = "0.1.0"
-const protoVersion = 1
+const (
+	serverVersion = "0.1.0"
+	protoVersion  = 1
+)
 
 func (s *Server) helloInfo() []interface{} {
 	// old style hello, trimmed down
-	return []interface{}{"server", "tfagent", "version", serverVersion, "proto", protoVersion, "id", s.peerID()}
+	return []interface{}{
+		"server",
+		"tfagent",
+		"version",
+		serverVersion,
+		"proto",
+		protoVersion,
+		"id",
+		s.peerID(),
+	}
 }
 
 func (s *Server) peerID() string {
-	return "//TODO"
+	return s.node.PeerID()
 }

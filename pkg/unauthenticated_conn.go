@@ -1,13 +1,15 @@
 package pkg
 
 import (
-	"crypto/ed25519"
 	"encoding/hex"
 
 	"github.com/pkg/errors"
 )
 
-var errNotAuthenticated = errors.New("command requires authentication")
+var (
+	errNotAuthenticated = errors.New("command requires authentication")
+	errInvalidSignatureLength = errors.New("invalid signature length")
+)
 
 type unauthenticatedConn struct {
 	s *Server
@@ -19,20 +21,19 @@ func newUnauthenticatedConn(s *Server) *unauthenticatedConn {
 	}
 }
 
-
 func (conn *unauthenticatedConn) Auth(dtid uint64, rawSig []byte) error {
-	var sig [64]byte
+	var sig [SignatureSize]byte
 	switch len(rawSig) {
-		case 64:
-			copy(sig[:], rawSig)
-		case 128:
-			data, err := hex.DecodeString(string(rawSig))
-			if err != nil {
+	case SignatureSize:
+		copy(sig[:], rawSig)
+	case SignatureSize * 2:
+		data, err := hex.DecodeString(string(rawSig))
+		if err != nil {
 			return err
-			}
-			copy(sig[:], data)
-		default:
-			return errInvalidSignatureLength
+		}
+		copy(sig[:], data)
+	default:
+		return errInvalidSignatureLength
 	}
 
 	pk, err := conn.s.ps.PublicKey(dtid)
@@ -61,8 +62,4 @@ func (conn *unauthenticatedConn) LLen() error {
 
 func (conn *unauthenticatedConn) LRange() error {
 	return errNotAuthenticated
-}
-
-func signatureValid(pk [32]byte, sig [64]byte) bool {
-	return ed25519.Verify(ed25519.PublicKey(pk[:]), []byte("A"), sig[:])
 }

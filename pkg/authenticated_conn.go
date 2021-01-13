@@ -13,28 +13,26 @@ var errAlreadyAuthenticated = errors.New("already authenticated")
 func newAuthenticatedConn(dtid uint64, s *Server) *authenticatedConn {
 	return &authenticatedConn{
 		dtid: dtid,
-		s: s,
+		s:    s,
 	}
 }
 
-
-func (conn *authenticatedConn) AUTH() error {
+func (conn *authenticatedConn) Auth(_ uint64, _ []byte) error {
 	return errAlreadyAuthenticated
 }
 
-func (conn *authenticatedConn) LPUSH() error {
+func (conn *authenticatedConn) LPush() error {
 	return nil
 }
 
-func (conn *authenticatedConn) LPOP() error {
+func (conn *authenticatedConn) LPop() error {
 	return nil
 }
 
-func (conn *authenticatedConn) LLEN() error {
+func (conn *authenticatedConn) LLen() error {
 	return nil
 }
 
-func (conn *authenticatedConn) LRANGE() error {
+func (conn *authenticatedConn) LRange() error {
 	return nil
 }
-

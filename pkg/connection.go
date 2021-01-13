@@ -1,11 +1,10 @@
 package pkg
 
-// Connection from a digital twin
-type Connection interface {
-	Auth() error
+// connection from a digital twin
+type connection interface {
+	Auth(dtid uint64, rawSig []byte) error
 	LPush() error
 	LPop() error
 	LLen() error
-	Lrange() error
+	LRange() error
 }
-
