@@ -16,7 +16,7 @@ import (
 // Server accepting connections, running RESP with custom commands
 type Server struct {
 	ps   PeerStore
-	node *P2PNode
+	node *BufferedNode
 
 	ln net.Listener
 
@@ -25,7 +25,7 @@ type Server struct {
 
 // NewServer creates a new server. This binds the given port, but does not
 // yet accept incomming connections
-func NewServer(ctx context.Context, port uint16, ps PeerStore, node *P2PNode) (*Server, error) {
+func NewServer(ctx context.Context, port uint16, ps PeerStore, node *BufferedNode) (*Server, error) {
 	s := &Server{
 		ps:   ps,
 		ctx:  ctx,

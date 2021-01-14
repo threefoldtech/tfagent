@@ -60,11 +60,12 @@ func (c *P2PNode) Send(message Message, peerID peer.ID, timeout time.Duration) e
 }
 
 // Start creates a libp2p host and starts handling connections
-func (c *P2PNode) Start(ctx context.Context, privateKey crypto.PrivKey) (err error) {
+func (c *P2PNode) Start(ctx context.Context, privateKey crypto.PrivKey) error {
 	c.ctx = ctx
+	var err error
 	c.host, c.routing, err = createLibp2pHost(ctx, privateKey)
 	if err != nil {
-		return
+		return err
 	}
 
 	log.Info().Str("ID", c.host.ID().Pretty()).Msg("started dht peer")

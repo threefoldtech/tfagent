@@ -20,9 +20,9 @@ func main() {
 	}
 
 	store := stores.MockStore{}
-	mc := make(chan pkg.Message)
-	node := pkg.NewP2PNode(mc)
+	node := pkg.NewBufferedNode(store)
 	node.Start(ctx, priv)
+
 	server, err := pkg.NewServer(ctx, 8888, store, node)
 	if err != nil {
 		log.Fatal().Err(err).Msg("failed to get server")
