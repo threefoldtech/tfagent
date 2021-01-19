@@ -13,6 +13,8 @@ import (
 	"github.com/secmask/go-redisproto"
 )
 
+const keySeparator = ":"
+
 // Server accepting connections, running RESP with custom commands
 type Server struct {
 	ps   PeerStore
@@ -143,8 +145,49 @@ func (s *Server) handleCon(conn net.Conn) {
 
 		case "LPUSH":
 			log.Debug().Msg("client LPUSH command")
+			if command.ArgCount() != 3 {
+				err = writer.WriteError(errInvalidArgCount.Error())
+				break
+			}
+
+			var dtid uint64
+			var subject string
+			dtid, subject, err = parseKey(string(command.Get(1)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			if err = c.LPush(dtid, subject, command.Get(2)); err != nil {
+				err = writer.WriteError(err.Error())
+			}
 		case "LPOP":
 			log.Debug().Msg("client LPOP command")
+			if command.ArgCount() != 2 {
+				err = writer.WriteError(errInvalidArgCount.Error())
+				break
+			}
+
+			var dtid uint64
+			var subject string
+			dtid, subject, err = parseKey(string(command.Get(1)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			var msg Message
+			msg, err = c.LPop(dtid, subject)
+			if err != nil {
+				if errors.Is(err, errNoMessage) {
+					err = writer.WriteBulksSlice(nil)
+					break
+				}
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			err = writer.WriteObjectsSlice([]interface{}{createKey(msg.Sender, msg.Topic), msg.Payload})
 		case "LLEN":
 			log.Debug().Msg("client LLEN command")
 		case "LRANGE":
@@ -162,9 +205,10 @@ func (s *Server) handleCon(conn net.Conn) {
 }
 
 var (
-	errInvalidCommand         = errors.New("unknown command")
-	errInvalidArgCount        = errors.New("invalid amount of argument for command")
-	errAuthorizationFailed    = errors.New("authorization failed")
+	errInvalidCommand      = errors.New("unknown command")
+	errInvalidArgCount     = errors.New("invalid amount of argument for command")
+	errAuthorizationFailed = errors.New("authorization failed")
+	errMalformedKey        = errors.New("malformed key")
 )
 
 const (
@@ -188,4 +232,26 @@ func (s *Server) helloInfo() []interface{} {
 
 func (s *Server) peerID() string {
 	return s.node.PeerID()
+}
+
+// parseKey parses a key as expected by the protocol, and returns the dtid and
+// subject from the key, or an error if parsing fails
+func parseKey(key string) (uint64, string, error) {
+	// key is formatted as <receiver_dtid>:<subject>
+	// subject can be empty
+	keyParts := strings.Split(key, keySeparator)
+	if len(keyParts) != 2 {
+		return 0, "", errMalformedKey
+	}
+
+	dtid, err := strconv.ParseUint(keyParts[0], 10, 64)
+	if err != nil {
+		return 0, "", errors.Wrap(err, "could not parse dtid")
+	}
+
+	return dtid, keyParts[1], nil
+}
+
+func createKey(dtid uint64, subject string) string {
+	return fmt.Sprintf("%d%s%s", dtid, keySeparator, subject)
 }

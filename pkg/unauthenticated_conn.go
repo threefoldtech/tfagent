@@ -7,7 +7,7 @@ import (
 )
 
 var (
-	errNotAuthenticated = errors.New("command requires authentication")
+	errNotAuthenticated       = errors.New("command requires authentication")
 	errInvalidSignatureLength = errors.New("invalid signature length")
 )
 
@@ -48,12 +48,12 @@ func (conn *unauthenticatedConn) Auth(dtid uint64, rawSig []byte) error {
 	return nil
 }
 
-func (conn *unauthenticatedConn) LPush() error {
+func (conn *unauthenticatedConn) LPush(_ uint64, _ string, _ []byte) error {
 	return errNotAuthenticated
 }
 
-func (conn *unauthenticatedConn) LPop() error {
-	return errNotAuthenticated
+func (conn *unauthenticatedConn) LPop(_ uint64, _ string) (Message, error) {
+	return Message{}, errNotAuthenticated
 }
 
 func (conn *unauthenticatedConn) LLen() error {
