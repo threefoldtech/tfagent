@@ -21,6 +21,7 @@ func newUnauthenticatedConn(s *Server) *unauthenticatedConn {
 	}
 }
 
+// Auth implements connection
 func (conn *unauthenticatedConn) Auth(dtid uint64, rawSig []byte) error {
 	var sig [SignatureSize]byte
 	switch len(rawSig) {
@@ -48,18 +49,22 @@ func (conn *unauthenticatedConn) Auth(dtid uint64, rawSig []byte) error {
 	return nil
 }
 
+// LPush implements connection
 func (conn *unauthenticatedConn) LPush(_ uint64, _ string, _ []byte) error {
 	return errNotAuthenticated
 }
 
+// LPop implements connection
 func (conn *unauthenticatedConn) LPop(_ uint64, _ string) (Message, error) {
 	return Message{}, errNotAuthenticated
 }
 
-func (conn *unauthenticatedConn) LLen() error {
+// LLen implements connection
+func (conn *unauthenticatedConn) LLen(_ uint64, _ string) error {
 	return errNotAuthenticated
 }
 
-func (conn *unauthenticatedConn) LRange() error {
-	return errNotAuthenticated
+// LRange implements connection
+func (conn *unauthenticatedConn) LRange(_ uint64, _ string, _ int, _ int) ([]Message, error) {
+	return nil, errNotAuthenticated
 }

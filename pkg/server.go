@@ -160,7 +160,10 @@ func (s *Server) handleCon(conn net.Conn) {
 
 			if err = c.LPush(dtid, subject, command.Get(2)); err != nil {
 				err = writer.WriteError(err.Error())
+				break
 			}
+
+			err = writer.WriteSimpleString("OK")
 		case "LPOP":
 			log.Debug().Msg("client LPOP command")
 			if command.ArgCount() != 2 {
@@ -190,8 +193,68 @@ func (s *Server) handleCon(conn net.Conn) {
 			err = writer.WriteObjectsSlice([]interface{}{createKey(msg.Sender, msg.Topic), msg.Payload})
 		case "LLEN":
 			log.Debug().Msg("client LLEN command")
+			if command.ArgCount() != 2 {
+				err = writer.WriteError(errInvalidArgCount.Error())
+				break
+			}
+
+			var dtid uint64
+			var subject string
+			dtid, subject, err = parseKey(string(command.Get(1)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			var count uint64
+			count, err = c.LLen(dtid, subject)
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			err = writer.WriteInt(int64(count))
 		case "LRANGE":
 			log.Debug().Msg("client LRANGE command")
+			if command.ArgCount() != 4 {
+				err = writer.WriteError(errInvalidArgCount.Error())
+				break
+			}
+
+			var dtid uint64
+			var subject string
+			dtid, subject, err = parseKey(string(command.Get(1)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			var start, end int
+			start, err = strconv.Atoi(string(command.Get(2)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			end, err = strconv.Atoi(string(command.Get(3)))
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			var messages []Message
+			messages, err = c.LRange(dtid, subject, start, end)
+			if err != nil {
+				err = writer.WriteError(err.Error())
+				break
+			}
+
+			output := make([]interface{}, len(messages))
+			for i := range messages {
+				output[2*i] = createKey(messages[i].Sender, messages[i].Topic)
+				output[2*i+1] = messages[i].Payload
+			}
+			err = writer.WriteObjectsSlice(output)
 		default:
 			log.Debug().Str("CMD", cmd).Msg("client sent unknown command")
 			err = writer.WriteError(errInvalidCommand.Error())
